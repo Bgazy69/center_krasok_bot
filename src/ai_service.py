@@ -1,10 +1,15 @@
+import logging
+
 import httpx
 
 from src.config import Settings
 from src.conversation import ChatMessage
 from src.knowledge import load_knowledge
 
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+logger = logging.getLogger(__name__)
+
+# Groq: OpenAI-совместимый API (ключи начинаются с gsk_)
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 SYSTEM_PROMPT_TEMPLATE = """Ты — дружелюбный AI-ассистент компании «Центр Красок #1» (Казахстан, centr-krasok.kz).
 Ты отвечаешь в Telegram в формате обычного чата: кратко, по делу, на русском языке.
@@ -81,10 +86,6 @@ def looks_off_topic(text: str) -> bool:
     return any(h in lower for h in OFF_TOPIC_HINTS)
 
 
-def _to_gemini_role(role: str) -> str:
-    return "user" if role == "user" else "model"
-
-
 class AIService:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -106,32 +107,37 @@ class AIService:
                 "Спросите, например: «Где салон в Алматы?» или «Какие бренды есть?»"
             )
 
-        contents: list[dict] = []
+        messages: list[dict[str, str]] = [
+            {"role": "system", "content": self._system_prompt},
+        ]
         for msg in history:
-            contents.append(
-                {
-                    "role": _to_gemini_role(msg.role),
-                    "parts": [{"text": msg.content}],
-                }
-            )
-        contents.append({"role": "user", "parts": [{"text": user_message}]})
+            messages.append({"role": msg.role, "content": msg.content})
+        messages.append({"role": "user", "content": user_message})
 
         payload = {
-            "systemInstruction": {"parts": [{"text": self._system_prompt}]},
-            "contents": contents,
-            "generationConfig": {
-                "temperature": 0.3,
-                "maxOutputTokens": 800,
-            },
+            "model": self._settings.groq_model,
+            "messages": messages,
+            "temperature": 0.3,
+            "max_tokens": 800,
         }
 
-        url = GEMINI_API_URL.format(model=self._settings.gemini_model)
         response = await self._client.post(
-            url,
-            params={"key": self._settings.gemini_api_key},
+            GROQ_API_URL,
+            headers={
+                "Authorization": f"Bearer {self._settings.groq_api_key}",
+                "Content-Type": "application/json",
+            },
             json=payload,
         )
-        response.raise_for_status()
+
+        if response.is_error:
+            logger.error(
+                "Groq API error %s: %s",
+                response.status_code,
+                response.text[:500],
+            )
+            response.raise_for_status()
+
         data = response.json()
 
         text = _extract_text(data)
@@ -148,10 +154,9 @@ class AIService:
 
 
 def _extract_text(data: dict) -> str:
-    candidates = data.get("candidates") or []
-    if not candidates:
+    choices = data.get("choices") or []
+    if not choices:
         return ""
 
-    parts = candidates[0].get("content", {}).get("parts") or []
-    chunks = [part.get("text", "") for part in parts if part.get("text")]
-    return "".join(chunks).strip()
+    message = choices[0].get("message") or {}
+    return (message.get("content") or "").strip()

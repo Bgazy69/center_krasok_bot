@@ -18,7 +18,7 @@ telegrambot2/
 │   └── company_knowledge.md   # структурированная информация о компании
 ├── src/
 │   ├── bot.py                 # Telegram handlers
-│   ├── ai_service.py          # Gemini API + промпт
+│   ├── ai_service.py          # Groq API + промпт
 │   ├── conversation.py        # история диалога
 │   ├── knowledge.py           # загрузка базы
 │   └── config.py
@@ -49,8 +49,8 @@ copy .env.example .env
 | Переменная | Описание |
 |------------|----------|
 | `TELEGRAM_BOT_TOKEN` | Токен от [@BotFather](https://t.me/BotFather) |
-| `GEMINI_API_KEY` | Ключ [Google AI Studio](https://aistudio.google.com/apikey) |
-| `GEMINI_MODEL` | Например `gemini-2.5-flash` |
+| `GROQ_API_KEY` | Ключ [Groq Console](https://console.groq.com/) (префикс `gsk_`) |
+| `GROQ_MODEL` | Например `llama-3.3-70b-versatile`, `llama-3.1-8b-instant` |
 
 ### 3. Запуск
 
@@ -79,7 +79,7 @@ python main.py
 
 - Python 3.11+
 - [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
-- [Google Gemini API](https://ai.google.dev/gemini-api/docs)
+- [Groq API](https://console.groq.com/docs/quickstart)
 
 ## Для проверяющего (задание)
 
@@ -87,7 +87,7 @@ python main.py
 |------------|------------|
 | Сбор и структурирование информации | `data/company_knowledge.md` |
 | Бот без команд | только `MessageHandler` на текст |
-| AI API | Google Gemini generateContent |
+| AI API | Groq chat completions (OpenAI-совместимый) |
 | Ограничение галлюцинаций | база в system prompt + temperature 0.3 + правила |
 | Контекст диалога | `ConversationStore` |
 | Защита от некорректных ответов | off-topic filter + fallback при ошибках |
